@@ -1,0 +1,249 @@
+---
+title: "Bhavik Bhatt"
+output: html_document
+---
+
+# Final Project: Top Spotify Tracks of 2017
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+library(tree)
+```
+
+## Introduction
+
+Spotify is an application that is used to stream music and provides many services including playlists, radio, and even videos. In the application, there is also a constant top songs list that gets updated every few days with songs that are most listened to around the world. Using a dataset, from Kaggle, that has collected information on the top 100 songs in 2017, we can analyze what makes a song rise up to the most popular list. First, we will show you how to obtain this data and organize it. Then, exploratory analysis with visualizations will be done to effectively see what the data looks like. From this information, we can produce hypotheses about the attributes of the songs and create models with machine learning to predict another song's qualities. 
+
+## Getting Started
+
+#### Required Libraries/Tools
+* Most Recent Version of R
+* tidyverse
+* dplyr
+* gridExtra
+* tree
+
+The dataset we will be using for this project can be found and downloaded from: [Top Spotify Tracks of 2017](https://www.kaggle.com/nadintamer/top-tracks-of-2017/data), provided by Kaggle.
+
+### Data Curation and Management
+
+The first step, after you have downloaded the dataset into the current directory, is to read the csv file and represent it as a table using R. To load the csv file, we will use a function, read.csv(), which will turn the organized data into a table. In the following code, you can also see that we have included all of the required libraries for this tutorial before doing anything else with the data.
+
+The first 10 rows of the data, in table form, can be seen below the code. The head function simply retrieves the first n rows of the table, where n is 10 in this case. In these 10 rows, we can see the different variables associated with each track, including id, artist, energy, danceability, etc. We use the tidyverse function as_tibble to make the data frame more readable and to see the variables and data types. Tibbles are just a modern take on data frames and supply less data. We will see actual data frames in the next portion of the tutorial.
+
+```{r load}
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+library(tree)
+
+df <- read.csv("featuresdf.csv")
+as_tibble(df)
+```
+
+##### Pipelining and dplyr
+After we have successfully created the data table, we can use pipelining and dplyr functions to change the actual table. Pipelining is essentially using multiple functions, where the previous function returns a table and the next function works on that returned table. This allows for chained processing. For example, you can select only certain columns using the select() function and then arrange the data based on decreasing energy on that returned table. The duration_ms column is also renamed to just duration for readability. Again, the first 10 rows are shown using head().
+
+More dplyr functions can be found here: [dplyr Resource](https://datascienceplus.com/data-manipulation-with-dplyr/)
+
+``` {r management}
+
+df <- df %>% 
+  select(name, artists, danceability, energy, loudness, speechiness, duration_ms) %>%
+  arrange(desc(energy)) %>% 
+  rename(duration = duration_ms)
+
+head(df, 10)
+
+```
+
+##### Grouping and Summarize
+
+The summarize function can be used to calculate values such as mean, median, maximum, and minimum. In this case, we first group the data by artists, since one artist can have many songs in the top tracks list for 2017. Then, we find the mean of their tracks' energy levels. The summarize function is a way to process data and it provides simple analysis. Next, we get a random 10% of the rows and display them using sample_frac(). You can see that only the artist names and their mean energy for their songs are listed in the table.
+
+``` {r management2}
+summary <- df %>% group_by(artists) %>%
+  summarize(mean_energy = mean(energy))
+
+sample_frac(summary, 0.1)
+
+```
+
+## Exploratory Data Analysis
+
+#### What is Exploratory Data Analysis
+
+Exploratory Data Analysis essentially helps us understand the data being studied better. It provides visualizations and statistical measures for the data. The goal of EDA is to explore the attributes in the observations and gain initial information about them and how they behave. This information can be used later for hypothesis testing and machine learning. 
+
+#### Plotting Mean Values
+
+First, we will group by artists, as we did before and find each artist's average loudness and average energy in their songs. Then, we can sort (arrange) in descreasing order and use head() like before to get the top 25 loudest artists. The
+way we will plot is using ggplot, which offers many plotting options including mapping and geometric representation of the data. In this example, we plot the mean energy vs mean loudness for the top 25 loudest artists. Using geom_smooth(), we can also display the regression line to see a general trend. Next, geom_text() is used to label each point with the name of the artist that corresponds to that data point. 
+
+``` {r ggplot}
+graph1 <- df %>% group_by(artists) %>% mutate(mean_loudness = mean(loudness), mean_energy = mean(energy)) %>%
+  arrange(desc(mean_loudness)) %>%
+  head(25) %>%
+  ggplot(mapping=aes(y=mean_energy, x=mean_loudness)) + 
+  geom_point() + geom_smooth(lm=loess) + geom_text(aes(label=artists),hjust=.5, vjust=-1.5, size = 2.5) + labs(x="Mean Loudness", y="Mean Energy", title="Mean Energy vs. Mean Loudness for Top 25 Loud Artists")
+
+graph1
+```
+
+Plotting this shows us that the loudest artist is Martin Jensen and he has energy levels of about 0.85 in his tracks. You can also see that as loudness increases, energy of the tracks increase by the blue regression line.
+
+#### Looking at Distributions
+
+Next, we can also look at the distributions of variables. First, we can use ggplot again with the x-axis representing duration and use geom_density() to use create a smooth line representing the density of tracks with each duration value.
+
+``` {r ggplot2}
+graph2 <- df %>%
+    ggplot(aes(x=duration)) +
+    geom_density()
+
+graph2
+```
+ 
+From this plot, we can see that most tracks have a duration of about 212,500 ms. Also, less tracks have longer durations because the right side of the plot drops down to a low density.
+
+##### Data Transformations
+
+Next, we can see the distribution of a single variable. In this case, we are looking at the variable danceability of tracks. First, we use mutate(), part of dplyr, to create a new variable representing the minimum dancaebility in the data. Then, we use mutate again to do a logarithmic transformation of the danceability column to make the boxplot more clear. We can plot this new variable, log_dance, for all tracks in the boxplot.
+
+``` {r dist}
+
+graph3 <- df %>%
+  mutate(min_dance=min(danceability, na.rm=TRUE)) %>%
+  mutate(log_dance = log(danceability - min_dance)) %>%
+  ggplot(aes(y=log_dance, x='')) +
+  geom_boxplot()
+
+graph3
+
+```
+
+The boxplot shows that for all of the data, there are 6 points that are outliers when it comes to danceability. These tracks have significantly low danceability. The boxplot also shows the median of danceability being around -0.5. 
+
+#### Standardized Variables
+
+The next topic is standardization of variables. We can again use mutate and create a new standardized variable for each track. In this case, we are standardizing speechiness, the amount of words used in a track. The mutate function along with the standardization formula is used to calculate the standardized speechiness for each track. We also have a separate plot that does not standardize speechiness. Both plots have energy as the dependent variable. The grid.arrange() method is used to place these two plots next to each other to make it clear.
+
+Again, ggplot is used to plot the regression lines as well as the data points. 
+
+``` {r ggplot3}
+
+graph <- df %>% mutate(mean_speechiness = mean(speechiness), s = sd(speechiness)) %>% ungroup() %>% mutate(t = ((speechiness - mean_speechiness)/s)) %>% ungroup()
+
+graph4 <- graph %>%
+  ggplot(aes(y=energy, x=speechiness)) + geom_smooth(method=lm) + geom_point() + labs(x="Speechiness", y="Energy", title="Energy vs. Speechiness")
+
+graph5 <- graph %>%
+  ggplot(aes(y=energy, x=t)) + geom_smooth(method=lm, colour="red") + geom_point() + labs(x="Standardized Speechiness", y="Energy", title="Energy vs. Standardized Speechiness")
+
+grid.arrange(graph4, graph5, ncol=2)
+
+```
+
+From these plots, we can see that they look similar. However, if you look at the x-axis values, the un-standardized plot gives us less information. The plot on the right, with standardized speechiness, has unitless values for the x-axis. Thus, the 0 value represents the mean of speechiness. Thus, when we were at the mean of speechiness, the energy level is about 0.66 based on the red regression line.
+
+
+## Hypothesis Testing
+
+#### What is Hypothesis Testing?
+
+Hypothesis testing is essentially an approach that allows us to test a hypothesis by comparing it with a null hypothesis. For example, a hypothesis can be that energy and speechiness are correlated in the data. The null hypothesis would be that there is no correlation. We can run hypothesis testing, by looking at the p-value, to reject or accept the null hypothesis. If the p-value is less than a certain significance level, usually 0.05, then we can reject the null hypothesis. However, if the p-value is greater than 0.05, then we cannot reject the null hypothesis.
+
+We will look at hypothesis testing by using the Spotify data and applying Machine Learning to it.
+
+## Machine Learning
+
+##### Linear Regression
+Linear regression is one application of machine learning. It allows us to construct confidence intervals, do hypothesis testing, and predicting values for more observations. Specifically, we fit a model to the current data and if the model is significant, based on hypothesis testing, we can use it to predict values for new observations, in this case, new tracks. 
+
+
+##### Fitting A Model
+
+We can essentially create an equation that predicts a dependent variable using linear regression. In this case, we will try to predict energy based on speechiness. Thus, the linear regression will provide us an estimate and an equation that look something like this: 
+$$
+energy = \beta_0 + \beta_1(speechiness)
+$$
+
+For example, once you fit a linear model to the data, you should be able to plug in values of the betas and speechiness to predict an energy level for a track.
+
+Using the lm() function, we can fit a simple linear model with speechiness as a predictor variable. This gives us an plaintext-like result so we must tidy it to make it into a table.
+
+``` {r hypothesis}
+
+spotify_fit <- lm(energy~speechiness, data=df)
+tmp <- spotify_fit
+broom::tidy(spotify_fit)
+```
+
+The results show that the intercept value is 0.692. The estimate for the speechiness predictor is -0.302. However, we must first look at the p-value associated with the speechiness estimate. The p-value is 0.039, which is less than 0.05. Thus, from what we have learned, we can reject the null hypothesis that there is no correlation between speechiness and energy. For every unit of increase speechiness, energy decreases by 0.302. 
+
+##### Interactions
+
+Interactions in a linear model are essentially to see if a pair of predictor variables have an impact on the outcome together. The star (*) in the lm function below is used to create an interaction between speechiness and duration to see if it has an effect on energy levels. The equation will look like this: 
+
+$$
+energy = \beta_0 + \beta_1(speechiness) + \beta_2(duration) + \beta_3(speechiness \times duration)
+$$
+
+``` {r hypothesis2}
+
+spotify_fit <- lm(energy~speechiness*duration, data=df)
+tmp2 <- spotify_fit
+broom::tidy(spotify_fit)
+```
+
+We can see that the speechiness and duration estimates both have p-values less than 0.05 so they are significant. However, the interaction between speechiness and duration together has a p-value of 0.12, which is much greater than 0.05, so that estimate is not significant. Thus, this model may not be the one to use. We will further analyze the effectiveness of both models.
+
+##### Model Performance
+
+Using the anova test, we can gather an F statistic for both models. F values in regression essentially tell us whether all of the regression coefficients are 0.
+``` {r anova}
+# use anova function to find anova for both models
+simple <- anova(tmp)
+interaction <- anova(tmp2)
+# tidy to show in table form
+broom::tidy(simple)
+broom::tidy(interaction)
+```
+
+By running anova on both models, we can see that the F-value for the simple model with only speechiness as a predictor is 4.372, which is higher than the F statistics for the other model, which has an F-value of 2.48. Thus, the simple model is a better model to use. The p-value for speechiness:duration, 0.118, is also greater than 0.05 so the F-statistic is not even significant. 
+
+We shall pick the simple model with only speechiness as a predictor.
+
+##### Tree Based Method: Regression Tree
+
+In machine learning, we can also use trees to predict a variable. By using the tree library, we can construct a tree with speechiness as the predictor variable again. Then, when we plot this tree, we can easily see which direction to go based on a speechiness level for a track.
+
+``` {r tree}
+tree <- tree(energy~speechiness, data=df)
+plot(tree)
+text(tree, pretty=10)
+```
+
+
+For example, if a track has a speechiness level of 0.04, the energy level can be predicted to be 0.5304. 
+
+## Conclusion
+Analyzing this top Spotify tracks of 2017 dataset essentially gives us more information about what kind of tracks become popular around the world. By analyzing variables such as energy, loudness, and danceability, we can observe which artists are creating popular songs. 
+
+There is much more that can be done with this dataset, including fitting more models that include more variables instead of just speechiness and duration. In addition, we can gather top songs for other years as well to see if these trends are the same. 
+
+We encourage you to download the dataset, do your own analysis, and make conclusions about the data.
+
+## References
+* [dplyr Resource](https://datascienceplus.com/data-manipulation-with-dplyr/)
+* [F Statistic](http://www.statisticshowto.com/probability-and-statistics/f-statistic-value-test/)
+* [Kaggle](https://www.kaggle.com/nadintamer/top-tracks-of-2017/data)
+
+
+
+
+
+
